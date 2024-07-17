@@ -1,0 +1,635 @@
+---
+title: "Demand Sales Forecasting"
+author: "Author: Lai Yeung"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float: 
+      collapsed: false
+      smooth_scroll: false
+    number_sections: true
+    # highlight: haddock
+  # word_document: default
+# runtime: shiny
+---
+
+<!-- tab.id='tab1', label='tab1', tab.cap="Product Revenue -->
+```{css, echo=FALSE}
+#header > h1 {
+  text-align: center;
+  color: Orange;
+  font-weight: bold;
+}
+#header > h4 {
+  text-align: right;
+  font-weight: bold;
+}
+h1, #TOC>ul>li {
+  font-weight: bold;
+}
+
+div.main-container {
+  max-width: 2880px;
+  margin-left: auto;
+  margin-right: auto;
+}
+```
+
+<!-- .main-container{ -->
+<!-- max-width: 1600px !important; -->
+<!-- max-width: 100% !important; -->
+<!-- max-width: 1600px; -->
+<!-- } -->
+  
+<!-- text front size -->
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE
+                      , message = FALSE
+                      , warning = FALSE
+                      , dev=c('png')
+                      ,ft_show_coltype = FALSE
+                      ,ft.align="center"
+                      ,tab.topcaption=FALSE
+                      # ,fig.asp = 0.9, fig.width = 9, out.width = "70%"
+                      # ,fig.asp = 0.8
+                      , fig.width = 24, out.width = "140%"
+                      ,tab.cap.pre="Table")
+
+library(flextable)
+
+set_flextable_defaults(font.size = 11,
+  digits = 1, decimal.mark = ".", big.mark = ",",
+  na_str = "NA", fmt_date = "%d/%m/%Y")
+
+init_flextable_defaults()
+
+tab_theme <- function(x, ...) {
+  x <- x %>% flextable() %>% theme_booktabs(bold_header = TRUE) %>% 
+    theme_vanilla() %>% 
+    theme_zebra() %>%
+    align(align = "center", part = "header") %>% 
+    align(align = "right", part = "body")
+  autofit(x)
+}
+
+use_df_printer()
+
+library(officer)
+small_border = fp_border(color="black", width = 1)
+
+# library(shiny)
+
+```
+
+```{r echo = FALSE, include=FALSE}
+library(readr) #Fastly write csv
+library(readxl) #Fastly write read xlsx
+library("excel.link")
+library(stringr)
+# library(stringi)
+library(dplyr)
+library(lubridate)
+library(data.table)
+library(sqldf)
+library(plotly)
+library(ggplot2)
+# remotes::install_version("crosstalk", version = "1.1.1", repos = "http://cran.us.r-project.org")
+library(crosstalk)
+library(DT)
+library(scales)
+library(reshape2)
+library(tidyr)
+library(summarytools)
+st_css(main = TRUE, global = TRUE)
+library(corrplot)
+library("heatmaply")
+library(paletteer)
+# Sys.setenv(JAVA_HOME='D:/Java/jre1.8.0_202')
+# library(xlsx)
+# library(tcltk)
+# library(rlang)
+# library(readxlsb)
+# library(zoo)
+
+#-------------------------- remove scientific notation
+options(scipen=999)
+gen_date <- today()
+# gen_date <- as.Date("2022-12-31")
+
+######################## Change ########################
+setwd("C:/Users/kwanl/Documents/GitHub/Demand_Sales_Forecasting/docs")
+# setwd("D:/Google Drive/Work/Vita Green/R0003")
+
+report_years <- c(2022, 2023)
+# report_measures <- c("Value", "Qty")
+channels <- c("XStore Retail")
+
+# expand.grid(report_year, report_measures) %>% unite("sheet_name", "Var1":"Var2", sep = " ")
+load("R0005_Plotly_Report_Data_Holidays and Promotions Pct Model.RData")
+
+# ######################## Filter Data ########################
+# combine_4 <- combine_3 %>% filter(DATAAREAID == "VGHP" 
+#                                   # & SOURCE == "XSTORE"
+#                                   )
+# 
+# combine_5 <- combine_4 %>% 
+#   distinct(PK, RTRANS_LINEITM_SEQ, .keep_all = T)
+#   # group_by(BUSINESS_DATE, SUB_BRAND)
+#   
+# names(combine_5)
+# 
+# ######################## Transform Data : TOTAL Level ########################
+# train_data_format <- data.table(combine_5)[, BUSINESS_DATE := as.Date(BUSINESS_DATE)
+# ]
+# 
+# train_data <- train_data_format %>% 
+#   group_by(BUSINESS_DATE) %>% 
+#   summarise(y = sum(NET_AMT)) %>% 
+#   select("ds" = BUSINESS_DATE, y)
+# 
+# 
+# ######################## Transform Data : SUB_BRAND Level ########################
+# combine_6 <- data.table(combine_5)[, DEAL_CNT := sum(ifelse(!is.na(DEAL_ID), 1, 0)), by = .(BUSINESS_DATE, SUB_BRAND)
+# ][, SUB_BRAND_TRAN_ITEM_CNT := .N, by = .(BUSINESS_DATE, SUB_BRAND)
+# ][, PROMO_PCT := round(DEAL_CNT/SUB_BRAND_TRAN_ITEM_CNT, 2)*100
+# ][, PROMO_EVENT_USED_50_PCT := ifelse(PROMO_PCT >= 50, 1, 0)
+# ]
+# 
+# # PROMO_EVENT_USED_50_PCT: special event for SUB_BRAND
+# PROMO_EVENT_USED_50_PCT <- combine_6 %>% 
+#   distinct(BUSINESS_DATE, SUB_BRAND, DEAL_CNT, SUB_BRAND_TRAN_ITEM_CNT, PROMO_EVENT_USED_50_PCT) %>% 
+#   arrange(BUSINESS_DATE, SUB_BRAND, PROMO_EVENT_USED_50_PCT) %>% 
+#   filter(SUB_BRAND_TRAN_ITEM_CNT > 5 & DEAL_CNT > 5 & PROMO_EVENT_USED_50_PCT == 1
+#          & !is.na(SUB_BRAND)
+#   ) %>% 
+#   anti_join(HOLIDAYS_RANGE, by = c("BUSINESS_DATE" = "datelist")) %>% 
+#   select("ds" = BUSINESS_DATE
+#          , "holiday" = SUB_BRAND
+#   ) %>% 
+#   mutate(lower_window = 0
+#          , upper_window = 0)
+# 
+# ######################## Predict Data ########################
+# ######################## Add SUB_BRAND's promotion as special event to holiday ########################
+# HOLIDAYS_N_EVENTS <- HOLIDAYS %>% bind_rows(PROMO_EVENT_USED_50_PCT)
+# ######################## Add future SUB_BRAND's promotion as special event to holiday ######################## 
+# # HOLIDAYS_N_EVENTS <- HOLIDAYS_N_EVENTS %>% bind_rows()
+# 
+# HOLIDAYS_N_EVENTS <- data.table(HOLIDAYS_N_EVENTS)[, ds := as.Date(ds)
+# ][, holiday := as.factor(holiday)
+# ]
+# 
+# # as.Date, Factor
+# HOLIDAYS <- data.table(HOLIDAYS)[, ds := as.Date(ds)
+# ][, holiday := as.factor(holiday)
+# ]
+
+# raw_data_6 <- raw_data_6 %>% filter(YEAR %in% report_years)
+
+######################################## ggplot ########################################
+theme_ben <- function(base_size = 14) {
+  theme_bw(base_size = base_size) %+replace%
+    theme(
+      # L'ensemble de la figure
+      plot.title = element_text(size = rel(1.5), face = "bold", margin = margin(0,0,5,0), hjust = 0.5, color = "gold3"),
+      plot.caption = element_text(size = rel(0.8), face = "italic", hjust = 1, color = "grey"),
+      # Zone où se situe le graphique
+      panel.grid.minor = element_blank(),
+      panel.border = element_blank(),
+      # Les axes
+      axis.title = element_text(size = rel(0.85), face = "bold"),
+      axis.text = element_text(size = rel(0.70), face = "bold"),
+      axis.line = element_line(color = "black", arrow = arrow(length = unit(0.3, "lines"), type = "closed")),
+      # La légende
+      legend.title = element_text(size = rel(0.85), face = "bold"),
+      legend.text = element_text(size = rel(0.70), face = "bold"),
+      legend.key = element_rect(fill = "transparent", colour = NA),
+      legend.key.size = unit(1.5, "lines"),
+      legend.background = element_rect(fill = "transparent", colour = NA),
+      # Les étiquettes dans le cas d'un facetting
+      strip.background = element_rect(fill = "#17252D", color = "#17252D"),
+      strip.text = element_text(size = rel(0.85), face = "bold", color = "white", margin = margin(5,0,5,0))
+    )
+}
+
+theme_layout <- function(data, caption = NA_character_, caption_margin = 100, y = -0.18){
+  data %>% layout(
+    legend = list(title = list(text = "Click below symbol to exclude:")),
+    margin = list(b = caption_margin),
+    annotations = list(x = 1, y = y, text = paste0("<i>",caption,"</i>"), 
+                       showarrow = F, xref='paper', yref='paper', 
+                       xanchor='right', yanchor='auto', xshift=0, yshift=0,
+                       font=list(size=13, color="#BEBEBE")),
+    xaxis = list(autorange = TRUE),
+    yaxis = list(autorange = TRUE)
+  )
+}
+
+# theme_layout <- function(data, caption = NA_character_, caption_margin = 100){
+#   data %>% layout(
+#     margin = list(t = 150,b = caption_margin),
+#     legend = list(title = list(text = NA)),
+#     # title = paste(
+#     #   '<b>', title,'</b>',
+#     #   '<br><sup><b>', subtitle,'</b></sup>'
+#     # ),
+#     annotations = list(x = 1, y = -0.18, text = paste0("<i>",caption,"</i>"), 
+#                        showarrow = F, xref='paper', yref='paper', 
+#                        xanchor='right', yanchor='auto', xshift=0, yshift=0,
+#                        font=list(size=13, color="#BEBEBE")),
+#     # xaxis = list(autorange = TRUE),
+#     yaxis = list(autorange = TRUE)
+#   )
+# }
+
+adj_legend_name_of_scale_color_manual <- function(pp){
+  # Adjust legend name in ggplotly 
+  for (i in 1:length(pp$x$data)) {
+    pp$x$data[[i]]$name <- str_extract(pp$x$data[[i]]$name, "[^\\(][^,]*")
+    pp$x$data[[i]]$legendgroup <- str_extract(pp$x$data[[i]]$legendgroup, "[^\\(][^,]*")
+  }
+  return(pp)
+}
+
+adj_smooth_hovertext <- function(pp){
+  # Adjust legend name in ggplotly 
+  for (i in 1:length(pp$x$data)) {
+    if (pp$x$data[[i]]$mode == "lines" && pp$x$data[[i]]$text == ""){
+      pp$x$data[[i]]$text <- paste0("Date: ", pp$x$data[[i]]$x, "\nProd Rev ", dollar(pp$x$data[[i]]$y))
+    }
+  }
+  return(pp)
+}
+
+title_font <- list(
+  size = 14*2,
+  color = "rgba(205, 173, 0, 1)")
+
+# Reference Line
+hline <- function(y = 0, color = "blue") {
+  list(
+    type = "line", 
+    x0 = 0, 
+    x1 = 1, 
+    xref = "paper",
+    y0 = y, 
+    y1 = y, 
+    line = list(color = color, dash = "dash")
+  )
+}
+
+# R Color Dict
+color <- grDevices::colors()[grep('gr(a|e)y', grDevices::colors(), invert = T)]
+
+setwd("C:/Users/kwanl/Documents/GitHub/Demand_Sales_Forecasting/docs")
+r_color_codes <- read_xlsx("RColorCodes.xlsx", guess_max = 1000000, .name_repair = "minimal", sheet = "Colors") %>% select(4, 6, 8)
+names(r_color_codes) <- c("NAME", "HEX", "RGB")
+
+r_color_codes <- data.table(r_color_codes)[, RGBA := gsub("rgb", "rgba", RGB)
+][, RGBA := gsub("max = 255", "1", RGBA)
+][!is.na(NAME)]
+
+# brewer_pal(type = "div", palette = "RdYlGn")(11)
+
+apply_colors_col <- function (apply_col, apply_colors_type, apply_colors, return_colors_type){
+  temp <- r_color_codes[[return_colors_type]][match(apply_colors[match(apply_col, levels(apply_col))], r_color_codes[[apply_colors_type]])]
+  names(temp) <- apply_col
+  return(temp)
+}
+```
+
+**Gen Report Date:** *`r gen_date`*
+
+**Years:** *`r report_years`*
+
+**Channels:** *`r channels`*
+
+**Measures:** *Product Revenue($)*
+
+# ) Product Revenue
+<!-- Adjust datatable width by using CSS -->
+<div style = "width:70%;">
+```{r echo = FALSE, include=FALSE, fig.asp = 1, fig.width = 9, out.width = "100%"}
+############################################################## By Channel ##############################################################
+
+############################################################## Product Revenue KPI ##############################################################
+######################## Manually Input ########################
+# measure_metrics <- data.frame()
+# 
+# measure_metrics_dummy <- data.frame(model_name = c("Holidays Only"))
+# 
+# m <- prophet(holidays = HOLIDAYS
+#              , holidays.prior.scale = 10     # Max = 10
+#              , changepoint.range = 0.5     # Max = 0.5
+#              # , growth = 'logistic'
+#              # , seasonality.mode = 'multiplicative'
+#              )
+# 
+# m <- add_seasonality(m, name='weekly', period=7, fourier.order=3, prior.scale=10)      # Max = 10
+# 
+# # train_data$cap <- max(train_data$y)*1.3
+# # train_data$floor <- 0
+# 
+# m <- fit.prophet(m, train_data)
+# 
+# future <- make_future_dataframe(m, periods = 180, freq = "day")
+# # future$cap <- max(train_data$y)*1.3
+# # future$floor <- 0
+# 
+# forecast <- predict(m, future)
+# 
+# ######################## Plot ########################
+# # plot_forecast_component(m, forecast, "Christmas Day")
+# # plot_forecast_component(m, forecast, "The first weekday after Christmas Day")
+# 
+# plot_forecast <- plot(m, forecast)
+# # plot_forecast
+# 
+# plot_components <- prophet_plot_components(m, forecast)
+# # plot_components
+# # dyplot.prophet(m, forecast)
+# 
+# if(exists("plot_forecast_list")){
+#   plot_forecast_list <- append(plot_forecast_list, plot_forecast)
+#   
+#   plot_components_list <- list(plot_components_list, plot_components)
+# }else{
+#   plot_forecast_list <- list(plot_forecast)
+#   
+#   plot_components_list <- list(plot_components)
+# }
+# 
+# ######################## Cross-Validation Data ########################
+# RSQUARE = function(y_actual,y_predict){
+#   cor(y_actual,y_predict)^2
+# }
+# 
+# df.cv <- cross_validation(m, initial = (nrow(train_data)-7*4+-1), period = 28, horizon = 28, units = 'days')
+# head(df.cv)
+# 
+# # R2 implies that the model explains the variability of the data
+# RSQUARE_VALUE <- RSQUARE(df.cv$y, df.cv$yhat)
+# 
+# MAPE_VALUE <- MAPE(df.cv$yhat, df.cv$y)
+# 
+# if(exists("RSQUARE_VALUE_list")){
+#   RSQUARE_VALUE_list <- append(RSQUARE_VALUE_list, RSQUARE_VALUE)
+#   MAPE_VALUE_list <- append(MAPE_VALUE_list, MAPE_VALUE)
+# }else{
+#   RSQUARE_VALUE_list <- list(RSQUARE_VALUE)
+#   MAPE_VALUE_list <- list(MAPE_VALUE)
+# }
+# 
+# # # Add to measure_metrics table
+# # measure_metrics_dummy$RSQUARE_VALUE = RSQUARE_VALUE
+# # measure_metrics_dummy$MAPE = MAPE(df.cv$yhat, df.cv$y)
+# # 
+# # measure_metrics <- measure_metrics %>% rbind(measure_metrics_dummy)
+# # 
+# # rm(measure_metrics_dummy)
+# 
+# # MAPE's format e.g. 0.05 = 5%
+# # It gives a measurement of the relative error that is as a percentage with respect to the real data
+# df.p <- performance_metrics(df.cv, rolling_window = 0.25)
+# 
+# plot_cv <- plot_cross_validation_metric(df.cv, metric = 'mape', rolling_window = 0.25)
+# 
+# if(exists("plot_cv_list")){
+#   plot_cv_list <- append(plot_cv_list, plot_cv)
+# }else{
+#   plot_cv_list <- list(plot_cv)
+# }
+# 
+# # Include outliers: Add to measure_metrics table
+# measure_metrics_dummy$RSQUARE_VALUE = tail(RSQUARE_VALUE_list, n = 1)[[1]]
+# measure_metrics_dummy$MAPE = tail(MAPE_VALUE_list, n = 1)[[1]]
+# 
+# measure_metrics <- measure_metrics %>% rbind(measure_metrics_dummy)
+# 
+# plot_cv <- tail(plot_cv_list, n = 1)[[1]]
+# 
+# rm(measure_metrics_dummy, RSQUARE_VALUE_list, MAPE_VALUE_list, plot_cv_list)
+# 
+# 
+# # Remove outliers to improve MAPE: Add to measure_metrics table
+# outliers_df.cv <- df.cv %>% mutate(DIFF = round(abs(yhat - y), 1)
+#                                    , DIFF_PCT = round(abs((yhat - y)/y)*100, 1)) %>% 
+#   arrange(desc(DIFF_PCT)) %>%
+#   filter(DIFF_PCT >= 100)
+# 
+# df.cv_rm_outliers <- df.cv %>% anti_join(outliers_df.cv, by = "ds")
+# 
+# measure_metrics$RSQUARE_VALUE_RM_OUTLIERS = RSQUARE(df.cv_rm_outliers$y, df.cv_rm_outliers$yhat)
+# measure_metrics$MAPE_RM_OUTLIERS = MAPE(df.cv_rm_outliers$yhat, df.cv_rm_outliers$y)
+# 
+# # Add vline to plot_cv: refer to those largest mape when happened
+# outliers_df.p <- df.p %>% arrange(desc(mape)) %>% 
+#   head(nrow(outliers_df.cv))
+# 
+# temp_data <- melt(df.cv %>% select(ds, y, yhat), id="ds") %>%  # convert to long format
+#   left_join(
+#     df.cv %>% select(ds, yhat_lower, yhat_upper) %>% mutate(variable = "yhat")
+#     , by = c("ds", "variable")
+#   ) %>% 
+#   select("DATE" = ds
+#          , variable
+#          , "PROD_REV" = value
+#          , yhat_lower
+#          , yhat_upper)
+# 
+# temp_data$DATE <- as.Date(temp_data$DATE)
+# 
+# shared_temp_data <- highlight_key(temp_data, ~DATE)
+# 
+# plot_time_series_ttl <- ggplotly(shared_temp_data %>% 
+#                                    ggplot(., aes(x = DATE, y = PROD_REV, color = variable, group = variable, text = paste0("Date: ", "<i><b>", DATE, "</i></b>", "\nWeekdays ", "<i><b>", weekdays(DATE), "</i></b>", "\nProd Rev ", "<i><b>", label_dollar(accuracy = 1)(PROD_REV), "</i></b>"))) +
+#                                    geom_point(size=2) +
+#                                    geom_line(size = 1) +
+#                                    geom_vline(xintercept = as.Date(outliers_df.cv$ds), linetype="dotted", color = "red") +
+#                                    geom_ribbon(aes(ymin = yhat_lower, ymax = yhat_upper), fill = "grey70", alpha = 0.3) +
+#                                    # geom_smooth(method = "loess", formula = y ~ x, na.rm = T, alpha = 0.2, linetype = 5, size = 0.5) +
+#                                    labs(title = paste0("Cross Validation Product Revenue Trend")
+#                                         # ,caption = "Data source: MNG + WTC"
+#                                         , x = "Date"
+#                                         , y = "Prod Rev") +
+#                                    scale_x_date(date_breaks = "1 month", date_labels = "%Y-%m", expand = expansion(mult = c(0, 0.05))) +
+#                                    scale_y_continuous(labels = label_dollar(scale_cut = cut_short_scale())) +
+#                                    theme_ben() +
+#                                    theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+#                                    scale_color_manual(values = c("#F8766D", "#00BFC4"))
+#                                  
+#                                  , dynamicTicks = TRUE
+#                                  , tooltip = c("text")
+# ) %>% 
+#   
+#   config(displaylogo = FALSE, modeBarButtons = list(list("toImage"), list("hoverClosestCartesian"), list("hoverCompareCartesian"))) %>% 
+#   highlight(., on = "plotly_hover", off = "plotly_doubleclick", selected = attrs_selected(showlegend = FALSE)) %>%
+#   # theme_layout(caption = "Data source: MNG + WTC", caption_margin = 100) %>%
+#   theme_layout(caption = "", caption_margin = 100) %>%
+#   layout(
+#     legend = list(x = 0.05, y = 0.95),
+#     xaxis = list(autorange = TRUE, hoverformat = "%Y-%m-%d"),
+#     yaxis = list(autorange = TRUE, hoverformat = "$,.0f", tickformat = "$,.2s")
+#   )
+# 
+# ######################## Analysis Report ########################
+# # y's Top head(n) days
+# holidays_n_events_n_regs_effect <- forecast %>% inner_join(
+#   train_data %>% arrange(desc(y)) %>% select(ds) %>% head(20)
+#   , by = "ds") %>%
+#   pivot_longer(
+#     cols = names(forecast)[-1]
+#     # values_to = "y"
+#   ) %>%
+#   filter(value != 0
+#          & !name %in% names(forecast)[c(1:5, (ncol(forecast)-7):ncol(forecast))]
+#          & !name %in% c("holidays", "weekly", "daily")
+#          & (grepl("lower", name) == FALSE & grepl("upper", name) == FALSE)
+#   ) %>%
+#   # filter(ds)
+#   group_by(ds) %>%
+#   arrange(ds, desc(abs(value))) %>%
+#   mutate(IMPORTANCE = row_number(),
+#          value_2 = paste(name,':', round(abs(value)))
+#          # value = round(abs(value))
+#          )
+#   # mutate(value_2 = paste(name,':', value))
+# 
+# holidays_n_events_n_regs_effect <- data.table(holidays_n_events_n_regs_effect)[name %in% HOLIDAYS$holiday, HOLIDAYS_OR_SE := "Holidays"
+#                                                                                ][is.na(HOLIDAYS_OR_SE), HOLIDAYS_OR_SE := "Special Events"
+#                                                                                  ]
+# 
+# # Table
+# table_holidays_n_events_n_regs_effect <- holidays_n_events_n_regs_effect %>%
+#   select(-c(name, value)) %>%
+#   pivot_wider(
+#     names_from = IMPORTANCE, values_from = value_2
+#     )
+# 
+# # Add the labels of holidays_n_events_n_regs_effect to plot_forecast
+# labels_holidays_n_events_n_regs_effect <- holidays_n_events_n_regs_effect %>%
+#   group_by(ds, HOLIDAYS_OR_SE) %>%
+#   slice(1:5) %>%
+#   arrange(ds, HOLIDAYS_OR_SE) %>%
+#   group_by(ds) %>%
+#   mutate(reason = paste0(name, collapse = ",\n")) %>%
+#   group_by(ds, HOLIDAYS_OR_SE) %>%
+#   distinct(ds, reason)
+
+```
+
+## Holidays and Sub Brands' Promotions Percentage Model
+```{r fig.height = 12}
+# plot_forecast <- ggplotly(plot_forecast +
+#                             geom_point(data = . %>% filter(ds %in% filter(labels_holidays_n_events_n_regs_effect, HOLIDAYS_OR_SE == "Holidays")$ds), size=7, pch = 21, colour = "red") +
+#                             geom_point(data = . %>% filter(ds %in% filter(labels_holidays_n_events_n_regs_effect, HOLIDAYS_OR_SE == "Special Events")$ds), size=5, pch = 21, colour = "green") +
+#                            labs(title = paste0("Product Revenue Trend With Forecast Next 180 Days")
+#                                 # ,caption = "Data source: MNG + WTC"
+#                                 , x = "Date"
+#                                 , y = "Prod Rev") +
+#                            theme_ben() +
+#                            theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+#                           , dynamicTicks = TRUE) %>% 
+#   
+#   config(displaylogo = FALSE, modeBarButtons = list(list("toImage"), list("hoverClosestCartesian"), list("hoverCompareCartesian"))) %>% 
+#   highlight(., on = "plotly_hover", off = "plotly_doubleclick", selected = attrs_selected(showlegend = FALSE)) %>%
+#   # theme_layout(caption = "Data source: MNG + WTC", caption_margin = 100) %>%
+#   theme_layout(caption = "", caption_margin = 100) %>%
+#   layout(
+#     legend = list(x = 0.05, y = 0.95),
+#     xaxis = list(autorange = TRUE, hoverformat = "%Y-%m-%d"),
+#     yaxis = list(autorange = TRUE, hoverformat = "$,.0f", tickformat = "$,.2s")
+#   ) %>% 
+#   style(text = paste0("Date: ", .$x$data[[4]]$x, "\nWeekdays :", weekdays(.$x$data[[4]]$x), "\nProd Rev ", label_dollar(accuracy = 1)((.$x$data[[4]]$y)), "\nReason :", filter(labels_holidays_n_events_n_regs_effect, HOLIDAYS_OR_SE == "Holidays")$reason), traces = c(4)) %>% 
+#   style(text = paste0("Date: ", .$x$data[[5]]$x, "\nWeekdays :", weekdays(.$x$data[[5]]$x), "\nProd Rev ", label_dollar(accuracy = 1)((.$x$data[[5]]$y)), "\nReason :", filter(labels_holidays_n_events_n_regs_effect, HOLIDAYS_OR_SE == "Special Events")$reason), traces = c(5)) %>% 
+#   style(text = paste0("Date: ", .$x$data[[2]]$x, "\nWeekdays :", weekdays(.$x$data[[2]]$x), "\nProd Rev ", label_dollar(accuracy = 1)((.$x$data[[2]]$y))), traces = c(2)) %>%
+#   style(text = paste0("Date: ", .$x$data[[3]]$x, "\nWeekdays :", weekdays(.$x$data[[3]]$x), "\nPredict Prod Rev ", label_dollar(accuracy = 1)((.$x$data[[3]]$y))), traces = c(3))
+# 
+# plot_forecast$x$data[[1]]$text <- gsub("ds: ", "Date:  ", plot_forecast$x$data[[1]]$text)
+# plot_forecast$x$data[[1]]$text <- gsub("y:  ", "Prod Rev:  $", plot_forecast$x$data[[1]]$text)
+# plot_forecast$x$data[[1]]$text <- gsub("yhat_lower:  ", "Predict Lower:  $", plot_forecast$x$data[[1]]$text)
+# plot_forecast$x$data[[1]]$text <- gsub("yhat_upper:  ", "Predict Upper:  $", plot_forecast$x$data[[1]]$text)
+
+plot_forecast
+```
+
+### Components
+```{r}
+plot_components[[1]]
+plot_components[[2]]
+plot_components[[3]]
+plot_components[[4]]
+```
+
+### Cross Validation
+```{r}
+plot_cv
+```
+```{r}
+plot_time_series_ttl
+```
+
+**Model:** *`r measure_metrics$model_name`*
+
+**RSquare:** *`r measure_metrics$RSQUARE_VALUE`*, **MAPE:** *`r measure_metrics$MAPE`*, **MDAPE:** *`r measure_metrics$MDAPE`*
+
+**If removed the outliers (no. of outliers = `r nrow(outliers_df.cv)`) that Difference% > 100%, the performance as below:**
+
+**RSquare:** *`r measure_metrics$RSQUARE_VALUE_RM_OUTLIERS`*, **MAPE:** *`r measure_metrics$MAPE_RM_OUTLIERS`*, **MDAPE:** *`r measure_metrics$MDAPE_RM_OUTLIERS`*
+
+These metrics are commonly used to evaluate the performance of a sales forecasting model.
+
+* **RSquare (R²): 0.8628255**
+
+R-squared, also known as the coefficient of determination, measures the proportion of variance in the dependent variable (in this case, sales) that is predictable from the independent variable(s).
+
+* Range: 0 to 1
+* Interpretation: 0.8628255 means that approximately 86.28% of the variance in the sales data can be explained by the model.
+* Assessment: This is a relatively high R-squared value, indicating that the model fits the data well. Generally, an R-squared above 0.7 is considered good for sales forecasting.
+
+* **MAPE (Mean Absolute Percentage Error): 0.256907**
+
+MAPE measures the average of the absolute percentage differences between the forecasted values and the actual values.
+
+* Calculation: Mean(|Actual - Forecast| / Actual) * 100
+* Interpretation: On average, the forecast is off by about 25.69% from the actual values.
+* Assessment: While there's no universal standard, a MAPE of 25.69% suggests moderate accuracy. For sales forecasting, this might be considered acceptable, but there's room for improvement.
+
+* **MDAPE (Median Absolute Percentage Error): 0.2702861**
+
+MDAPE is similar to MAPE but uses the median instead of the mean, making it less sensitive to extreme errors.
+
+* Calculation: Median(|Actual - Forecast| / Actual) * 100
+* Interpretation: The median error is about 27.03% from the actual values.
+* Assessment: The MDAPE is slightly higher than the MAPE, which suggests that there might be some extreme errors pulling the MAPE down. The median error being around 27% indicates moderate accuracy.
+
+**Overall Assessment:**
+
+The model shows good explanatory power (high R-squared) but moderate predictive accuracy (MAPE and MDAPE around 25-27%). This suggests that while the model captures the general trends in the data well, there's still a notable margin of error in its predictions. Depending on the specific requirements of your sales forecasting application, this level of accuracy might be acceptable, but there could be room for improvement, especially in reducing the percentage errors.
+
+# ) Appendix
+```{r, results='asis'}
+# define_keywords(title.dfSummary = "Data Summary Description")
+# `Data : Scan Sales Report (MNG and WTC)`<- raw_data_6
+# st_options(footnote = NA)
+# print(dfSummary(`Data : Scan Sales Report (MNG and WTC)`,
+#                 display.labels = FALSE,
+#                 # headings = FALSE,
+#                 plain.ascii  = FALSE,
+#                 style        = "grid",
+#                 graph.magnif = 1,
+#                 valid.col    = FALSE
+#                 # tmp.img.dir  = "/tmp"
+#                 ),
+#       # max.tbl.height = 3600,
+#       method = "render")
+```
+
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>
