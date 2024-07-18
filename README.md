@@ -1,8 +1,48 @@
 # Demand Sales Forecasting Machine Learning
 
 ## Introduction
-- Perform sales analysis for product channels in a step-by-step manner.
-- Analyze and gain insights into product performance across different sales channels.
+- Perform demand sales forecasting using machine learning techniques to predict future sales and demand patterns.
+- Enable better inventory management, production planning, and resource allocation based on accurate sales forecasts.
+- Optimize business strategies and decision-making by understanding market trends and customer behavior.
+
+<!--
+### Steps for Demand Sales Forecasting:
+
+1. Data Collection:
+   - Gather historical sales data, including time-series information, product attributes, pricing, promotions, and external factors (e.g., holidays, economic indicators).
+
+2. Data Preprocessing:
+   - Clean the data by handling missing values, outliers, and inconsistencies.
+   - Transform and preprocess the data to ensure compatibility with machine learning algorithms.
+   - Split the data into training and testing sets.
+
+3. Exploratory Data Analysis (EDA):
+   - Analyze and visualize the data to identify trends, seasonality, and patterns.
+   - Conduct statistical analysis to understand correlations and dependencies between variables.
+
+4. Feature Engineering:
+   - Create new features from the existing data that can capture important signals and improve forecasting accuracy.
+   - Examples include lagged variables, moving averages, time-based features, and categorical encodings.
+
+5. Model Selection:
+   - Choose appropriate machine learning algorithms for demand sales forecasting, such as time-series models (e.g., ARIMA, SARIMA), regression models, or ensemble methods (e.g., random forests, gradient boosting).
+
+6. Model Training and Evaluation:
+   - Train the selected model using the training data and validate its performance using appropriate evaluation metrics (e.g., mean absolute error, root mean squared error).
+   - Fine-tune the model parameters to optimize forecasting accuracy.
+
+7. Forecasting:
+   - Apply the trained model to predict future sales and demand patterns.
+   - Generate forecasts at desired time intervals (e.g., daily, weekly, monthly) for the desired forecast horizon.
+
+8. Performance Monitoring and Refinement:
+   - Continuously monitor the forecast accuracy and compare it against actual sales data.
+   - Refine the forecasting model and retrain it periodically to adapt to changing market conditions and improve accuracy.
+
+9. Decision Making and Actions:
+   - Utilize the demand sales forecasts to make informed decisions regarding inventory management, production planning, pricing, promotions, and resource allocation.
+   - Optimize business strategies based on forecasted demand patterns and market insights.
+-->
 
 ## Quick start to view
 Click the link to view **>** [Demand Sales Forecasting Machine Learning](https://lai-ai-bi-ci.github.io/Demand_Sales_Forecasting/)
